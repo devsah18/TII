@@ -1,0 +1,41 @@
+[
+  {
+    "timestamp": "2026-10-03T10:02:11",
+    "user": "alex",
+    "source_ip": "185.12.44.21",
+    "event_type": "login",
+    "status": "failed"
+  },
+  {
+    "timestamp": "2026-10-03T10:04:32",
+    "user": "alex",
+    "source_ip": "185.12.44.21",
+    "event_type": "api_request",
+    "endpoint": "/api/profile/export",
+    "status": "success"
+  },
+  {
+    "timestamp": "2026-10-03T10:05:08",
+    "user": "alex",
+    "source_ip": "185.12.44.21",
+    "event_type": "sensitive_endpoint",
+    "resource": "customer_database",
+    "status": "success"
+  },
+  {
+    "timestamp": "2026-10-03T10:05:44",
+    "user": "alex",
+    "source_ip": "185.12.44.21",
+    "event_type": "data_export",
+    "records": 125000,
+    "status": "success"
+  },
+  {
+    "timestamp": "2026-10-03T10:06:01",
+    "user": "alex",
+    "source_ip": "185.12.44.21",
+    "event_type": "external_connection",
+    "destination": "203.0.113.50",
+    "status": "success"
+  }
+]
