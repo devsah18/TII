@@ -21,6 +21,8 @@ class TraceStore:
         self._activity: List[Dict[str, Any]] = []
         self._alerts: List[Dict[str, Any]] = []
         self._alert_seq = 0
+        self._runs: List[Dict[str, Any]] = []
+        self._run_seq = 0
 
     # -- ids ------------------------------------------------------------------
     def next_file_id(self, prefix: str = "FILE") -> str:
@@ -41,6 +43,46 @@ class TraceStore:
     def get_file(self, file_id: str) -> Optional[Dict[str, Any]]:
         with self._lock:
             return self._files.get(file_id)
+
+    # -- pipeline run history -------------------------------------------------
+    def record_run(
+        self,
+        *,
+        source: str,
+        label: str,
+        incident_id: Optional[str] = None,
+        risk_score: Optional[int] = None,
+        severity: Optional[str] = None,
+        event_count: int = 0,
+        detection_count: int = 0,
+        mitre_count: int = 0,
+        stages: Optional[List[Dict[str, Any]]] = None,
+        extra: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Append a completed analysis run to the history (most recent kept)."""
+        with self._lock:
+            self._run_seq += 1
+            run = {
+                "run_id": f"RUN-{self._run_seq:04d}",
+                "source": source,          # upload | simulation | live | reanalyze
+                "label": label,
+                "incident_id": incident_id,
+                "risk_score": risk_score,
+                "severity": severity,
+                "event_count": event_count,
+                "detection_count": detection_count,
+                "mitre_count": mitre_count,
+                "stages": stages or [],
+                "at": _utcnow_iso(),
+                "extra": extra or {},
+            }
+            self._runs.append(run)
+            self._runs = self._runs[-200:]
+            return run
+
+    def runs(self, limit: int = 50) -> List[Dict[str, Any]]:
+        with self._lock:
+            return list(reversed(self._runs))[:limit]
 
     def total_file_events(self) -> int:
         """Total number of events parsed across every tracked file."""
@@ -165,9 +207,11 @@ class TraceStore:
             self._incidents.clear()
             self._activity.clear()
             self._alerts.clear()
+            self._runs.clear()
             self._file_seq = 0
             self._incident_seq = 0
             self._alert_seq = 0
+            self._run_seq = 0
 
 
 def _utcnow_iso() -> str:

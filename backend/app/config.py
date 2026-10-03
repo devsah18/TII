@@ -12,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # --- upload safety -----------------------------------------------------------
 MAX_UPLOAD_BYTES = int(os.getenv("TRACE_MAX_UPLOAD_BYTES", str(5 * 1024 * 1024)))
-ALLOWED_EXTENSIONS = {".log", ".txt", ".csv", ".json"}
+ALLOWED_EXTENSIONS = {".log", ".txt", ".csv", ".json", ".pcap", ".pcapng", ".cap"}
 MAX_EVENTS = int(os.getenv("TRACE_MAX_EVENTS", "20000"))
 
 # --- http --------------------------------------------------------------------

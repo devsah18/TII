@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { BASE_DISPLAY } from './services/api.js'
 import { StatusPill } from './components/ui.jsx'
@@ -8,19 +8,22 @@ const NAV = [
   { to: '/', icon: '◈', label: 'Dashboard' },
   { to: '/upload', icon: '⬆', label: 'Upload Log' },
   { to: '/simulation', icon: '⚡', label: 'Simulation' },
+  { to: '/live', icon: '📡', label: 'Live Capture' },
   { to: '/incidents', icon: '◷', label: 'Incidents' },
+  { to: '/history', icon: '🗃', label: 'History' },
 ]
 
-export default function Layout({ online, health, children }) {
+export default function Layout({ online, health, children, onOpenPalette }) {
   const { pathname } = useLocation()
   const { theme, toggle } = useTheme()
+  const [collapsed, setCollapsed] = useState(false)
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${collapsed ? 'collapsed' : ''}`}>
       <aside className="sidebar no-print">
         <div className="brand">
           <div className="brand-mark">TR</div>
-          <div className="brand-text">
+          <div className="brand-text collapse-hide">
             <span className="brand-title">TRACE</span>
             <span className="brand-sub">Incident Investigator</span>
           </div>
@@ -34,13 +37,20 @@ export default function Layout({ online, health, children }) {
           </button>
         </div>
 
+        <button className="palette-trigger" onClick={onOpenPalette} title="Open command palette (Ctrl+K)">
+          <span className="pt-icon">⌕</span>
+          <span className="collapse-hide" style={{ flex: 1, textAlign: 'left' }}>Search or jump to…</span>
+          <kbd className="collapse-hide">Ctrl K</kbd>
+        </button>
+
         <nav className="nav" aria-label="Primary">
-          <div className="nav-group-label">Operations</div>
+          <div className="nav-group-label collapse-hide">Operations</div>
           {NAV.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
               end={n.to === '/'}
+              title={n.label}
               className={({ isActive }) =>
                 `nav-link ${isActive || (n.to === '/incidents' && pathname.startsWith('/incidents')) ? 'active' : ''}`
               }
@@ -48,13 +58,21 @@ export default function Layout({ online, health, children }) {
               <span className="nav-icon" aria-hidden="true">
                 {n.icon}
               </span>
-              {n.label}
+              <span className="collapse-hide">{n.label}</span>
             </NavLink>
           ))}
         </nav>
 
+        <button
+          className="collapse-btn"
+          onClick={() => setCollapsed((c) => !c)}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        >
+          {collapsed ? '»' : '«'} <span className="collapse-hide">Collapse</span>
+        </button>
+
         <div className="sidebar-foot">
-          <div className="card card-pad" style={{ padding: '12px 13px' }}>
+          <div className="card card-pad collapse-hide" style={{ padding: '12px 13px' }}>
             <div className="meta-label">Backend</div>
             <div className="row mt-8" style={{ gap: 7 }}>
               <span className={`dot ${online ? 'dot-ok pulse' : 'dot-bad'}`} />

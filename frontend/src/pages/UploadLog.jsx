@@ -2,7 +2,8 @@ import React, { useCallback, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Card, Alert, PipelineSteps, MetaItem, SeverityBadge, Empty } from '../components/ui.jsx'
 import { TopBar } from '../Layout.jsx'
-import { uploadLog, investigate, ApiError } from '../services/api.js'
+import { useToast } from '../components/Toast.jsx'
+import { uploadLog, investigate, getConfig, ApiError } from '../services/api.js'
 import { fmtBytes } from '../utils/format.js'
 
 const STEPS = [
@@ -15,13 +16,21 @@ const STEPS = [
   { id: 'report', label: 'Generating investigation' },
 ]
 
-const ACCEPT = '.log,.txt,.csv,.json'
+const ACCEPT = '.log,.txt,.csv,.json,.pcap,.pcapng,.cap'
 
 export default function UploadLog({ online, onInvestigated }) {
   const navigate = useNavigate()
+  const toast = useToast()
   const inputRef = useRef(null)
   const [dragging, setDragging] = useState(false)
   const [fileInfo, setFileInfo] = useState(null)
+  const [config, setConfig] = useState(null)
+
+  React.useEffect(() => {
+    getConfig()
+      .then(setConfig)
+      .catch(() => {})
+  }, [])
   const [steps, setSteps] = useState(() => STEPS.map((s) => ({ ...s, status: 'pending' })))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -69,11 +78,13 @@ export default function UploadLog({ online, onInvestigated }) {
         setStep('report', 'done', `${inc.mitre_techniques?.length || 0} techniques`)
 
         if (onInvestigated) onInvestigated(inc)
+        toast.push(`Investigation ${inc.incident_id} ready — risk ${inc.risk_score}/100`, 'ok')
         setTimeout(() => navigate(`/incidents/${inc.incident_id}`), 420)
       } catch (err) {
         const message =
           err instanceof ApiError ? err.message : 'The uploaded file could not be processed.'
         setError(message)
+        toast.push(message, 'error')
         setSteps((prev) => prev.map((s) => (s.status === 'active' ? { ...s, status: 'failed' } : s)))
         setFileInfo((f) => (f ? { ...f, parsing: 'failed' } : f))
       } finally {
@@ -90,7 +101,7 @@ export default function UploadLog({ online, onInvestigated }) {
     if (!ACCEPT.split(',').includes(ext)) {
       reset()
       setError(
-        'The uploaded file could not be parsed. Supported formats: LOG, TXT, CSV, JSON.',
+        'The uploaded file could not be parsed. Supported formats: LOG, TXT, CSV, JSON, PCAP.',
       )
       setFileInfo({ name: file.name, size: file.size, eventCount: null, parsing: 'failed' })
       return
@@ -102,7 +113,7 @@ export default function UploadLog({ online, onInvestigated }) {
     <>
       <TopBar
         title="Upload Security Log"
-        subtitle="Supported formats: .log · .txt · .csv · .json — parsed and investigated automatically."
+        subtitle="Supported formats: .log · .txt · .csv · .json · .pcap / .pcapng — parsed and investigated automatically."
         online={online}
       />
 
@@ -136,8 +147,8 @@ export default function UploadLog({ online, onInvestigated }) {
             }}
           >
             <div className="dropzone-icon">🗂</div>
-            <div style={{ fontWeight: 600 }}>Drag &amp; drop your security log here</div>
-            <div className="dropzone-hint">or click to browse — .log, .txt, .csv, .json</div>
+            <div style={{ fontWeight: 600 }}>Drag &amp; drop your security log or packet capture here</div>
+            <div className="dropzone-hint">or click to browse — .log, .txt, .csv, .json, .pcap / .pcapng</div>
             <input
               ref={inputRef}
               type="file"
@@ -236,6 +247,23 @@ export default function UploadLog({ online, onInvestigated }) {
 {`[{"timestamp":"2026-10-02T10:42:01Z","source_ip":"185.42.18.91","username":"admin",
   "event_type":"login_failed","status":"failed","message":"Failed login attempt for admin"}]`}
             </pre>
+          </div>
+          <div>
+            <div className="meta-label">Packet capture (PCAP / PCAPNG)</div>
+            <p className="card-note">
+              Upload a Wireshark capture (<span className="mono">.pcap</span> /{' '}
+              <span className="mono">.pcapng</span>). TRACE reads it with tshark in file mode (no
+              admin rights needed) and converts packets into normalized events — so port scans and
+              large outbound transfers become detections, incidents and MITRE mappings automatically.
+            </p>
+            {config?.pcap_supported === false && (
+              <div className="mt-8">
+                <Alert kind="warn" title="PCAP support unavailable">
+                  tshark was not found on the server. Install Wireshark to enable packet-capture
+                  uploads.
+                </Alert>
+              </div>
+            )}
           </div>
         </div>
         <p className="card-note mt-12">

@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { Card, Alert } from './ui.jsx'
 import { reanalyze, ApiError } from '../services/api.js'
+import { useToast } from './Toast.jsx'
 
 /**
  * Detection rule tuning. The analyst moves the thresholds and re-runs the SAME
@@ -15,6 +16,7 @@ const DEFAULTS = {
 
 export default function ThresholdPanel({ incident, onReanalyzed }) {
   const fileId = incident.source_file?.file_id
+  const toast = useToast()
   const [t, setT] = useState(DEFAULTS)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState('')
@@ -32,8 +34,14 @@ export default function ThresholdPanel({ incident, onReanalyzed }) {
           `${res.incident.detection_count} detection(s).`,
       )
       if (onReanalyzed) onReanalyzed(res.incident)
+      toast.push(
+        `Re-analysed: risk ${res.incident.risk_score}/100 · ${res.incident.detection_count} detection(s)`,
+        'info',
+      )
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Re-analysis failed.')
+      const msg = err instanceof ApiError ? err.message : 'Re-analysis failed.'
+      setError(msg)
+      toast.push(msg, 'error')
     } finally {
       setBusy(false)
     }

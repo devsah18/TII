@@ -1,5 +1,27 @@
-import React from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { SEVERITY_LABEL, severityClass, scoreColour } from '../utils/format.js'
+
+/** Smoothly animates a number from 0 to `value` whenever it changes. */
+function useCountUp(value, duration = 700) {
+  const [display, setDisplay] = useState(0)
+  const fromRef = useRef(0)
+  useEffect(() => {
+    const target = Number(value) || 0
+    const from = fromRef.current
+    const start = performance.now()
+    let raf
+    const tick = (now) => {
+      const t = Math.min(1, (now - start) / duration)
+      const eased = 1 - Math.pow(1 - t, 3)
+      setDisplay(Math.round(from + (target - from) * eased))
+      if (t < 1) raf = requestAnimationFrame(tick)
+      else fromRef.current = target
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [value, duration])
+  return display
+}
 
 export function SeverityBadge({ severity, label }) {
   const s = String(severity || 'info').toLowerCase()
@@ -27,11 +49,12 @@ export function Card({ title, icon, note, action, children, className = '' }) {
 }
 
 export function StatCard({ label, value, foot, colour = '#38bdf8', loading }) {
+  const animated = useCountUp(value)
   return (
     <div className="card stat" style={{ '--stat-colour': colour }}>
       <div className="stat-label">{label}</div>
       <div className="stat-value" style={{ color: colour }}>
-        {loading ? '—' : value}
+        {loading ? '—' : animated}
       </div>
       {foot && <div className="stat-foot">{foot}</div>}
     </div>

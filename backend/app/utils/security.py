@@ -13,6 +13,12 @@ from ..config import ALLOWED_EXTENSIONS, MAX_UPLOAD_BYTES
 
 _SAFE_NAME_RE = re.compile(r"[^A-Za-z0-9._-]+")
 
+# Packet captures are binary by nature, so the text-log binary sniff must not
+# apply to them. They are still size-limited and never executed.
+_PCAP_EXTENSIONS = {".pcap", ".pcapng", ".cap"}
+
+_SUPPORTED_MSG = "Supported formats: LOG, TXT, CSV, JSON, PCAP."
+
 
 class UploadValidationError(ValueError):
     """Raised when an upload fails validation. Carries a user-facing message."""
@@ -32,16 +38,18 @@ def validate_upload(filename: str, size: int, content: bytes) -> None:
     ext = Path(filename).suffix.lower()
     if ext not in ALLOWED_EXTENSIONS:
         raise UploadValidationError(
-            "The uploaded file could not be parsed. Supported formats: LOG, TXT, CSV, JSON."
+            f"The uploaded file could not be parsed. {_SUPPORTED_MSG}"
         )
-    if size > MAX_UPLOAD_BYTES:
+    # Packet captures get a larger allowance than text logs (a pcap is dense).
+    max_bytes = MAX_UPLOAD_BYTES * 4 if ext in _PCAP_EXTENSIONS else MAX_UPLOAD_BYTES
+    if size > max_bytes:
         raise UploadValidationError(
-            f"File is too large. Maximum allowed size is {MAX_UPLOAD_BYTES // (1024 * 1024)} MB."
+            f"File is too large. Maximum allowed size is {max_bytes // (1024 * 1024)} MB."
         )
     if size == 0:
         raise UploadValidationError("The uploaded file is empty.")
-    if b"\x00" in content[:4096]:
+    if ext not in _PCAP_EXTENSIONS and b"\x00" in content[:4096]:
         raise UploadValidationError(
             "The uploaded file does not look like a text log (binary content detected). "
-            "Supported formats: LOG, TXT, CSV, JSON."
+            + _SUPPORTED_MSG
         )

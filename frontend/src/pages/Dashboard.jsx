@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { Card, StatCard, Alert, SeverityBadge, Spinner, Empty, Bar } from '../components/ui.jsx'
 import { TopBar } from '../Layout.jsx'
 import AlertsFeed from '../components/AlertsFeed.jsx'
+import { useToast } from '../components/Toast.jsx'
 import useBackend from '../hooks/useBackend.js'
 import { simulate, listIncidents, listScenarioCatalog, loadScenario, ApiError } from '../services/api.js'
 import { fmtTime, relativeTime, scoreColour, fmtPct } from '../utils/format.js'
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const toast = useToast()
   const { health, stats, error, loading, refresh, online } = useBackend()
   const [simulating, setSimulating] = useState(false)
   const [simError, setSimError] = useState('')
@@ -97,9 +99,15 @@ export default function Dashboard() {
     try {
       const res = await loadScenario(scenario)
       await refresh()
+      toast.push(
+        `Loaded “${res.scenario_name}” → ${res.incident.incident_id} (risk ${res.incident.risk_score})`,
+        'ok',
+      )
       navigate(`/incidents/${res.incident.incident_id}`)
     } catch (err) {
-      setSimError(err instanceof ApiError ? err.message : 'The scenario could not be loaded.')
+      const msg = err instanceof ApiError ? err.message : 'The scenario could not be loaded.'
+      setSimError(msg)
+      toast.push(msg, 'error')
     } finally {
       setSimulating(false)
     }

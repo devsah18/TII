@@ -349,9 +349,12 @@ def _rule_exfiltration(events: List[Dict[str, Any]], thresholds: Optional[Dict[s
     for ev in events:
         if ev["event_type"] != "data_transfer":
             continue
+        # Bytes may be nested under "extra" or flattened to the top level,
+        # depending on how the event was built. Check both.
         extra = ev.get("extra") or {}
+        raw_bytes = extra.get("bytes", ev.get("bytes"))
         try:
-            size = int(extra.get("bytes") or 0)
+            size = int(raw_bytes or 0)
         except (TypeError, ValueError):
             size = 0
         text = str(ev.get("raw_message") or "").lower()

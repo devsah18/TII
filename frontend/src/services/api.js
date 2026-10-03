@@ -169,3 +169,20 @@ export const reanalyze = (fileId, thresholds) =>
     body: JSON.stringify({ file_id: fileId, thresholds: thresholds || {} }),
     timeout: 45000,
   })
+
+/* ----------------------------------------------------------- live capture */
+export const getLiveStatus = () => request('/api/live/status', { timeout: 8000 })
+
+export const startLiveCapture = (iface, bpfFilter = '') =>
+  request('/api/live/start', {
+    method: 'POST',
+    headers: jsonHeaders,
+    body: JSON.stringify({ interface: iface, bpf_filter: bpfFilter }),
+    timeout: 20000,
+  })
+
+export const stopLiveCapture = () =>
+  request('/api/live/stop', { method: 'POST', headers: jsonHeaders, timeout: 10000 })
+
+/* --------------------------------------------------------------- history */
+export const getHistory = (limit = 50) => request(`/api/history?limit=${limit}`, { timeout: 8000 })

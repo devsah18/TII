@@ -2,12 +2,13 @@
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 from typing import Any, Dict
 
 from fastapi import APIRouter, File, HTTPException, UploadFile, status
 
 from ..config import ALLOWED_EXTENSIONS, LLM_API_KEY, MAX_UPLOAD_BYTES, SERVICE_NAME, VERSION
-from ..engines import demo, parser
+from ..engines import demo, parser, pcap
 from ..models.schemas import (
     ChatRequest,
     HealthResponse,
@@ -18,6 +19,7 @@ from ..models.schemas import (
 )
 from ..services import chat as chat_service
 from ..services import investigation as investigation_service
+from ..services import live_capture as live_service
 from ..utils.security import UploadValidationError, sanitize_filename, validate_upload
 from ..utils.store import store
 
@@ -43,11 +45,16 @@ async def upload(file: UploadFile = File(...)) -> UploadResponse:
     except UploadValidationError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
-    text = raw.decode("utf-8", errors="replace")
     file_id = store.next_file_id("FILE")
+    is_pcap = Path(safe_name).suffix.lower() in pcap.PCAP_EXTENSIONS
 
     try:
-        events = parser.parse_log(text, safe_name)
+        if is_pcap:
+            # Packet capture: tshark -> normalized network events.
+            events = pcap.parse_pcap_bytes(raw, safe_name)
+        else:
+            text = raw.decode("utf-8", errors="replace")
+            events = parser.parse_log(text, safe_name)
     except parser.ParseError as exc:
         store.put_file(
             file_id,
@@ -80,6 +87,21 @@ async def upload(file: UploadFile = File(...)) -> UploadResponse:
     record = store.get_file(file_id)
     if record is not None:
         record["incident_id"] = incident["incident_id"]
+    store.record_run(
+        source="pcap" if is_pcap else "upload",
+        label=safe_name,
+        incident_id=incident["incident_id"],
+        risk_score=incident["risk_score"],
+        severity=incident["severity"],
+        event_count=len(events),
+        detection_count=incident.get("detection_count", 0),
+        mitre_count=len(incident.get("mitre_techniques", [])),
+        stages=_pipeline_stages(
+            len(events), incident.get("detection_count", 0),
+            len(incident.get("mitre_techniques", [])), incident["incident_id"],
+        ),
+        extra={"file_id": file_id, "filename": safe_name},
+    )
     store.log_activity(
         "investigation",
         f"Investigation {incident['incident_id']} opened from {safe_name}",
@@ -178,6 +200,21 @@ def reanalyze(payload: Dict[str, Any]) -> Dict[str, Any]:
     )
     incident["tuned_thresholds"] = thresholds
     store.put_incident(incident)
+    store.record_run(
+        source="reanalyze",
+        label=f"Tuning on {record.get('filename')}",
+        incident_id=incident["incident_id"],
+        risk_score=incident["risk_score"],
+        severity=incident["severity"],
+        event_count=len(events),
+        detection_count=incident.get("detection_count", 0),
+        mitre_count=len(incident.get("mitre_techniques", [])),
+        stages=_pipeline_stages(
+            len(events), incident.get("detection_count", 0),
+            len(incident.get("mitre_techniques", [])), incident["incident_id"],
+        ),
+        extra={"thresholds": thresholds, "file_id": file_id},
+    )
     return {"success": True, "incident": incident, "thresholds": thresholds}
 
 
@@ -225,6 +262,21 @@ def simulate(payload: SimulateRequest) -> Dict[str, Any]:
         "simulation",
         f"Simulated {demo.SCENARIOS[scenario]['name']}",
         {"file_id": file_id, "incident_id": incident["incident_id"], "risk_score": incident["risk_score"]},
+    )
+    store.record_run(
+        source="simulation",
+        label=demo.SCENARIOS[scenario]["name"],
+        incident_id=incident["incident_id"],
+        risk_score=incident["risk_score"],
+        severity=incident["severity"],
+        event_count=len(events),
+        detection_count=incident.get("detection_count", 0),
+        mitre_count=len(incident.get("mitre_techniques", [])),
+        stages=_pipeline_stages(
+            len(events), incident.get("detection_count", 0),
+            len(incident.get("mitre_techniques", [])), incident["incident_id"],
+        ),
+        extra={"scenario": scenario, "file_id": file_id},
     )
     return {
         "success": True,
@@ -283,6 +335,21 @@ def load_scenario(name: str) -> Dict[str, Any]:
         "simulation",
         f"Loaded scenario {demo.SCENARIOS[scenario]['name']}",
         {"file_id": file_id, "incident_id": incident["incident_id"], "risk_score": incident["risk_score"]},
+    )
+    store.record_run(
+        source="simulation",
+        label=demo.SCENARIOS[scenario]["name"],
+        incident_id=incident["incident_id"],
+        risk_score=incident["risk_score"],
+        severity=incident["severity"],
+        event_count=len(events),
+        detection_count=incident.get("detection_count", 0),
+        mitre_count=len(incident.get("mitre_techniques", [])),
+        stages=_pipeline_stages(
+            len(events), incident.get("detection_count", 0),
+            len(incident.get("mitre_techniques", [])), incident["incident_id"],
+        ),
+        extra={"scenario": scenario, "file_id": file_id},
     )
     return {
         "success": True,
@@ -409,6 +476,63 @@ def acknowledge_alert(alert_id: str) -> Dict[str, Any]:
     return {"success": True, "alert_id": alert_id, "acknowledged": True}
 
 
+# ---------------------------------------------------------------------------
+# live capture (tshark)
+# ---------------------------------------------------------------------------
+
+
+def _pipeline_stages(event_count: int, detection_count: int, mitre_count: int, incident_id: str) -> List[Dict[str, Any]]:
+    """Describe the deterministic pipeline stages for a completed run.
+
+    Purely descriptive: the numbers come from the actual finished analysis, so
+    the UI can render a truthful stage-by-stage record of what ran.
+    """
+    return [
+        {"id": "ingest", "label": "Ingest", "detail": f"{event_count} event(s)", "status": "done"},
+        {"id": "normalize", "label": "Normalize", "detail": "schema applied", "status": "done"},
+        {"id": "detect", "label": "Detect", "detail": f"{detection_count} detection(s)", "status": "done"},
+        {"id": "correlate", "label": "Correlate", "detail": "entities merged", "status": "done"},
+        {"id": "reconstruct", "label": "Reconstruct", "detail": incident_id, "status": "done"},
+        {"id": "mitre", "label": "MITRE map", "detail": f"{mitre_count} technique(s)", "status": "done"},
+        {"id": "respond", "label": "Response", "detail": "plan generated", "status": "done"},
+    ]
+
+
+@router.get("/history")
+def analysis_history(limit: int = 50) -> Dict[str, Any]:
+    """Chronological history of every automatic analysis run."""
+    runs = store.runs(limit=limit)
+    return {"success": True, "count": len(runs), "runs": runs}
+
+@router.get("/live/status")
+def live_status() -> Dict[str, Any]:
+    """Current live-capture state plus the interfaces that can be captured."""
+    return {"success": True, **live_service.live_capture.status()}
+
+
+@router.post("/live/start")
+def live_start(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """Start streaming packets from an interface into the pipeline.
+
+    Body: ``{"interface": "\\Device\\NPF_{...}", "bpf_filter": "tcp port 22"}``
+    Requires tshark + Npcap; on Windows the backend must run as Administrator.
+    """
+    interface = (payload or {}).get("interface") or ""
+    bpf = (payload or {}).get("bpf_filter") or ""
+    result = live_service.live_capture.start(interface, bpf)
+    if not result.get("ok"):
+        raise HTTPException(status_code=400, detail=result.get("error") or "Could not start capture.")
+    store.log_activity("live", f"Live capture started on {result.get('interface')}", {"bpf": bpf})
+    return {"success": True, **result}
+
+
+@router.post("/live/stop")
+def live_stop() -> Dict[str, Any]:
+    result = live_service.live_capture.stop()
+    store.log_activity("live", "Live capture stopped", {"packets": result.get("packets")})
+    return {"success": True, **result}
+
+
 @router.get("/files/{file_id}")
 def get_file(file_id: str) -> Dict[str, Any]:
     record = store.get_file(file_id)
@@ -458,6 +582,7 @@ def client_config() -> Dict[str, Any]:
         "service": SERVICE_NAME,
         "version": VERSION,
         "allowed_extensions": sorted(ALLOWED_EXTENSIONS),
+        "pcap_supported": pcap.tshark_available(),
         "max_upload_bytes": MAX_UPLOAD_BYTES,
         "ai_mode": "llm" if LLM_API_KEY else "deterministic-fallback",
     }
