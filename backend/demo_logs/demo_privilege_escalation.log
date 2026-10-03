@@ -1,0 +1,34 @@
+2026-10-02T10:38:00Z soc-collector trace: health_check status=ok target=10.0.0.22 latency=4ms
+2026-10-02T10:38:12Z 10.0.0.15 sshd: Accepted password for j.okafor from 10.0.0.5 port 51244 ssh2
+2026-10-02T10:38:27Z 10.0.0.22 nginx: api_request GET /api/v1/orders status=200 src=10.0.0.31 bytes=8421
+2026-10-02T10:38:41Z 10.0.0.22 cron: background_process backup-check completed user=backup_svc
+2026-10-02T10:38:58Z 10.0.0.15 sshd: Accepted password for m.tanaka from 10.0.0.8 port 40122 ssh2
+2026-10-02T10:39:09Z soc-collector trace: health_check status=ok target=10.0.0.22 latency=6ms
+2026-10-02T10:39:22Z 10.0.0.22 nginx: api_request GET /api/v1/profile status=200 src=10.0.0.44 bytes=2310
+2026-10-02T10:39:40Z 10.0.0.40 postgres: database_access routine stats query user=reporting_svc db=metrics_db rows=18
+2026-10-02T10:40:03Z 10.0.0.22 systemd: service started worker-pool.service
+2026-10-02T10:40:25Z soc-collector trace: health_check status=ok target=10.0.0.40 latency=3ms
+2026-10-02T10:40:48Z 10.0.0.15 sshd: Accepted publickey for s.reynolds from 10.0.0.12 port 33811 ssh2
+2026-10-02T10:41:05Z 10.0.0.22 nginx: api_request POST /api/v1/search status=200 src=10.0.0.31 bytes=15533
+2026-10-02T10:42:00Z fw-edge kernel: port scan detected from 91.211.90.14 against 10.0.0.15 ports 22,80,443
+2026-10-02T10:42:09Z fw-edge kernel: reconnaissance probe from 91.211.90.14 tcp flag SYN count=214
+2026-10-02T10:42:24Z 10.0.0.15 sshd: Failed password for admin from 91.211.90.14 port 40000 ssh2
+2026-10-02T10:42:27Z 10.0.0.15 sshd: Failed password for admin from 91.211.90.14 port 40007 ssh2
+2026-10-02T10:42:31Z 10.0.0.15 sshd: Failed password for admin from 91.211.90.14 port 40014 ssh2
+2026-10-02T10:42:36Z 10.0.0.15 sshd: Failed password for admin from 91.211.90.14 port 40021 ssh2
+2026-10-02T10:42:40Z 10.0.0.15 sshd: Failed password for admin from 91.211.90.14 port 40028 ssh2
+2026-10-02T10:42:44Z 10.0.0.15 sshd: Failed password for admin from 91.211.90.14 port 40035 ssh2
+2026-10-02T10:42:49Z 10.0.0.15 sshd: Failed password for admin from 91.211.90.14 port 40042 ssh2
+2026-10-02T10:43:30Z 10.0.0.15 sshd: Accepted password for admin from 91.211.90.14 port 51882 ssh2
+2026-10-02T10:43:32Z 10.0.0.15 sshd: session opened for user admin by (uid=0)
+2026-10-02T10:44:00Z 10.0.0.22 sudo: admin : TTY=pts/0 ; PWD=/home/admin ; USER=root ; COMMAND=/usr/bin/bash -c 'cat /etc/shadow' command=sudo -i new_privilege=root
+2026-10-02T10:44:06Z 10.0.0.22 sudo: admin privilege granted: user=admin elevated privileges root access
+2026-10-02T10:44:14Z 10.0.0.22 auditd: privilege escalation detected user=admin from=uid1000 to=uid0 src=10.0.0.15
+2026-10-02T10:45:00Z 10.0.0.40 postgres: database_access user=admin db=customers_db query="SELECT * FROM customer_records" rows=48211 sensitive=true
+2026-10-02T10:45:11Z 10.0.0.40 postgres: database_access user=admin db=payments_db query="SELECT card_token, customer_id FROM payments" rows=12044
+2026-10-02T10:45:23Z 10.0.0.22 trace: file read sensitive file=/opt/app/config/credentials.env user=admin confidential=true
+2026-10-02T10:46:00Z 10.0.0.22 trace: data transfer outbound bytes=18874368 dst=45.133.216.77 src=10.0.0.22 protocol=https user=admin
+2026-10-02T10:46:18Z fw-edge kernel: bulk download outbound to 45.133.216.77 bytes=5242880 flagged=true
+2026-10-02T10:47:00Z soc-collector trace: health_check status=ok target=10.0.0.22 latency=5ms
+2026-10-02T10:47:21Z 10.0.0.22 nginx: api_request GET /api/v1/status status=200 src=10.0.0.31 bytes=980
+2026-10-02T10:47:44Z 10.0.0.15 sshd: Accepted password for backup_svc from 10.0.0.9 port 22110 ssh2
