@@ -274,7 +274,7 @@ trace/
 │   │   ├── services/api.js         single source of API URLs
 │   │   ├── hooks/useBackend.js     health + stats polling hook
 │   │   └── utils/format.js
-│   ├── package.json, vite.config.js, .env.example
+│   ├── package.json, vite.config.js, .env.example,
 └── .gitignore
 ```
 
