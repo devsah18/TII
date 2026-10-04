@@ -10,10 +10,11 @@ from typing import Any, Dict
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from .config import CORS_ORIGINS, MAX_UPLOAD_BYTES, SERVICE_NAME, VERSION
+from .config import BASE_DIR, CORS_ORIGINS, MAX_UPLOAD_BYTES, SERVICE_NAME, VERSION
 from .routes.trace import router
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -27,12 +28,14 @@ app = FastAPI(
     redoc_url=None,
 )
 
+FRONTEND_DIST = BASE_DIR.parent / "frontend" / "dist"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
-    allow_origin_regex=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+    allow_origins=CORS_ORIGINS if CORS_ORIGINS else ["*"],
+    allow_origin_regex=r".*",
     allow_credentials=True,
-    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_methods=["*"],
     allow_headers=["*"],
     expose_headers=["*"],
 )
@@ -46,7 +49,9 @@ def _startup() -> None:
 
 
 @app.get("/")
-def root() -> Dict[str, Any]:
+def root():
+    if FRONTEND_DIST.exists() and (FRONTEND_DIST / "index.html").exists():
+        return FileResponse(FRONTEND_DIST / "index.html")
     return {
         "service": SERVICE_NAME,
         "version": VERSION,
@@ -99,3 +104,15 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
             "path": request.url.path,
         },
     )
+
+
+if FRONTEND_DIST.exists() and (FRONTEND_DIST / "index.html").exists():
+    app.mount("/assets", StaticFiles(directory=str(FRONTEND_DIST / "assets")), name="static_assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def serve_spa(full_path: str):
+        target = FRONTEND_DIST / full_path
+        if full_path and target.is_file():
+            return FileResponse(target)
+        return FileResponse(FRONTEND_DIST / "index.html")
+
